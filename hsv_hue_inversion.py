@@ -65,7 +65,7 @@ def main() -> None:
             print("Erro: d deve estar entre 0 e 180.")
             return
     except Exception:
-        print("Uso: python hue_invert.py <imagem> <H> <d> [-s]")
+        print("Uso: python hsv_hur_inversion.py <imagem> <H> <d> [-s]")
         return
 
     result = process_image(image_path, h, d)
