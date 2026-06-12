@@ -12,11 +12,7 @@ def hsv_image_process(pixel):
     return pixel.astype(np.uint8)
 
 def angle(x: float) -> float:
-    while x >= 360.0:
-        x -= 360.0
-    while x < 0.0:
-        x += 360.0
-    return x
+    return x % 360.0
 
 def angle_numpy(x):
     return np.mod(x, 360.0)
@@ -28,41 +24,58 @@ def interval(h: float, d: float) -> Callable[[np.ndarray], np.ndarray]:
         nonlocal begin, end
         x = angle_numpy(x)
         cond1 = (begin <= end) & (begin <= x) & (x <= end)
-        cond2 = (end < begin) & ((begin <= x) | (end >= x))
+        cond2 = (end < begin) & ((begin <= x) | (x <= end))
         return cond1 | cond2
     return inner
 
-def invert_angle(x):
-    return angle(x - 180.0)
+def process_image(image_path: str, h: float, d: float) -> np.ndarray:
+    image = cv2.imread(path.abspath(image_path), 1)
+    if image is None:
+        raise ValueError(f"Could not read image: {image_path}")
+    is_in_interval = interval(h, d)
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    # OpenCV H channel: [0,179] → scale to [0,359] for computation
+    pixels_in_interval = is_in_interval(hsv_image[:, :, 0].astype(np.float32) * 2)
+    hsv_image[:, :, 0] = np.where(
+        pixels_in_interval,
+        hsv_image_process(hsv_image[:, :, 0]),
+        hsv_image[:, :, 0]
+    )
+    return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
 
-def parse_arg_data() -> tuple[str, float, float, bool]:
+def parse_arg_data():
     args = create_parser().parse_args()
     return (args.image_file_path[0], float(args.hue_value[0]), float(args.hue_amplitude[0]), args.save)
 
-def create_parser() -> argparse.ArgumentParser:
+def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("image_file_path", nargs=1, help="Image file path")
-    parser.add_argument("hue_value", nargs=1, help="Central value of hue range that will be inverted")
-    parser.add_argument("hue_amplitude", nargs=1, help="""Amplitude of hue range that will be inverted.
-The hue range starts at (hue_value - hue_amplitude) and ends at (hue_value + amplitude)""")
-    parser.add_argument("-s", "--save", action="store_true", help="""Optional flag to enable output image file saving.
-The output image file will be saved as \"out_<path>\"""")
+    parser.add_argument("hue_value", nargs=1, help="Central value of hue range (0-360)")
+    parser.add_argument("hue_amplitude", nargs=1, help="Amplitude of hue range (0-180)")
+    parser.add_argument("-s", "--save", action="store_true", help="Save output image as out_<filename>")
     return parser
 
 def main() -> None:
     try:
         image_path, h, d, save = parse_arg_data()
-        image = cv2.imread(path.abspath(image_path), 1)
+        if not (0 <= h <= 360):
+            print("Erro: H deve estar entre 0 e 360.")
+            return
+        if not (0 <= d <= 180):
+            print("Erro: d deve estar entre 0 e 180.")
+            return
     except Exception:
-        print("""Unable to parse arguments. It is necessary to provide: <image_file_path> <hue_value> <hue_amplitude>.
-It is necessary that <image_file_path> be a image file path, and <hue_value> and <hue_amplitude> be numbers""")
+        print("Uso: python hue_invert.py <imagem> <H> <d> [-s]")
         return
-    is_in_interval = interval(h, d)
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    pixels_in_interval = (lambda pixel: is_in_interval(2 * pixel))(hsv_image[:, :, 0].astype(np.float32))
-    hsv_image[:, :, 0] = np.where(pixels_in_interval, hsv_image_process(hsv_image[:, :, 0]), hsv_image[:, :, 0])
-    show_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-    cv2.imshow("Hue inverted image according to hue range", show_image)
+
+    result = process_image(image_path, h, d)
+
+    if save:
+        out_path = "out_" + path.basename(image_path)
+        cv2.imwrite(out_path, result)
+        print(f"Imagem salva como: {out_path}")
+
+    cv2.imshow("Hue inverted image", result)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
