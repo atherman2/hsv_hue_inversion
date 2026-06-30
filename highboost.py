@@ -19,7 +19,7 @@ def high_boost(image, m, k):
     # blurred version using simple average (box) filter mxm
     f_blur = uniform_filter(f, size=m)
 
-    # mask = original - blurred
+    # mask = original - blurred (can have negative values)
     mask = f - f_blur
 
     # g = f + k * mask
@@ -29,7 +29,14 @@ def high_boost(image, m, k):
     g = np.clip(g, 0, 1)
     g = (g * 255).astype(np.uint8)
 
-    return g
+    return g, mask
+
+
+def normalize_mask(mask):
+    # min-max normalization just for visualization purposes
+    mn, mx = mask.min(), mask.max()
+    norm = (mask - mn) / (mx - mn)
+    return (norm * 255).astype(np.uint8)
 
 
 def main():
@@ -44,10 +51,15 @@ def main():
 
     image = io.imread(input_path, as_gray=True)
 
-    result = high_boost(image, m, k)
+    result, mask = high_boost(image, m, k)
+    mask_vis = normalize_mask(mask)
+
+    mask_path = output_path.replace(".png", "_mask.png")
 
     io.imsave(output_path, result)
+    io.imsave(mask_path, mask_vis)
     print(f"Saved result to {output_path}")
+    print(f"Saved normalized mask to {mask_path}")
 
 
 if __name__ == "__main__":
