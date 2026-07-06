@@ -45,7 +45,12 @@ def main():
         sys.exit(1)
 
     input_path = sys.argv[1]
+
     m = int(sys.argv[2])
+    if m % 2 == 0 or m < 1:
+        print("-> Erro: m deve ser um inteiro positivo ímpar.")
+        return
+    
     k = float(sys.argv[3])
     output_path = sys.argv[4] if len(sys.argv) > 4 else "output.png"
 
@@ -58,6 +63,7 @@ def main():
 
     io.imsave(output_path, result)
     io.imsave(mask_path, mask_vis)
+    
     print(f"Saved result to {output_path}")
     print(f"Saved normalized mask to {mask_path}")
 
